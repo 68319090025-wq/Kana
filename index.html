@@ -107,7 +107,7 @@
     <h1>💡 ระบบควบคุมไฟ</h1>
 
     <div class="ip-config">
-        <input type="text" id="ipAddr" placeholder="192.168.1.XX (IP ของบอร์ด)" onchange="saveIP()">
+        <input type="text" id="ipAddr" placeholder="172.20.10.3 (IP ของบอร์ด)" onchange="saveIP()">
     </div>
 
     <div class="status-grid">
@@ -146,7 +146,7 @@
 
     function sendCommand(path) {
         const ip = document.getElementById('ipAddr').value;
-        if(!ip) return alert("กรุณาระบุ IP Address ของบอร์ดก่อน");
+        if(!ip) return alert("172.20.10.3");
         
         fetch(`http://${ip}${path}`)
             .then(() => updateStatus()) // อัปเดตสถานะทันทีหลังจากส่งคำสั่ง
