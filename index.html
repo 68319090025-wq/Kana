@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Light Control</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4a90e2;
+            --success: #2ecc71;
+            --danger: #e74c3c;
+            --dark: #2c3e50;
+            --bg: #f4f7f6;
+        }
+
+        body {
+            font-family: 'Kanit', sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .dashboard {
+            background: white;
+            width: 90%;
+            max-width: 400px;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        h1 { color: var(--dark); font-size: 24px; margin-bottom: 25px; }
+
+        .ip-config {
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 10px;
+        }
+
+        input {
+            width: 80%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            text-align: center;
+            font-family: inherit;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: #fff;
+            padding: 15px;
+            border-radius: 15px;
+            border: 1px solid #eee;
+        }
+
+        .stat-card small { color: #888; display: block; margin-bottom: 5px; }
+        .stat-card span { font-size: 20px; font-weight: 600; color: var(--dark); }
+
+        .led-indicator {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .led-on { background: var(--success); box-shadow: 0 0 10px var(--success); }
+        .led-off { background: #ccc; }
+
+        .btn-stack { display: flex; flex-direction: column; gap: 10px; }
+        
+        button {
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: 'Kanit', sans-serif;
+        }
+
+        .btn-on { background-color: var(--success); color: white; }
+        .btn-off { background-color: var(--danger); color: white; }
+        .btn-auto { background-color: var(--primary); color: white; }
+        
+        button:active { transform: scale(0.96); opacity: 0.9; }
+
+        .refresh-text { font-size: 12px; color: #aaa; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+    <h1>💡 ระบบควบคุมไฟ</h1>
+
+    <div class="ip-config">
+        <input type="text" id="ipAddr" placeholder="192.168.1.XX (IP ของบอร์ด)" onchange="saveIP()">
+    </div>
+
+    <div class="status-grid">
+        <div class="stat-card" style="grid-column: span 2;">
+            <small>ค่าความสว่าง (LDR)</small>
+            <span id="lightVal">0</span>
+        </div>
+        <div class="stat-card">
+            <small>สถานะ LED</small>
+            <div id="ledColor" class="led-indicator led-off"></div>
+            <span id="ledStatus">ปิด</span>
+        </div>
+        <div class="stat-card">
+            <small>โหมด</small>
+            <span id="modeStatus">อัตโนมัติ</span>
+        </div>
+    </div>
+
+    <div class="btn-stack">
+        <button class="btn-on" onclick="sendCommand('/on')">เปิดไฟ (Manual)</button>
+        <button class="btn-off" onclick="sendCommand('/off')">ปิดไฟ (Manual)</button>
+        <button class="btn-auto" onclick="sendCommand('/auto')">กลับไปโหมดอัตโนมัติ</button>
+    </div>
+
+    <p class="refresh-text">เชื่อมต่อข้อมูลอัตโนมัติทุก 2 วินาที</p>
+</div>
+
+<script>
+    // ดึง IP ที่เคยบันทึกไว้ในเบราว์เซอร์
+    document.getElementById('ipAddr').value = localStorage.getItem('esp_ip') || '';
+
+    function saveIP() {
+        const ip = document.getElementById('ipAddr').value;
+        localStorage.setItem('esp_ip', ip);
+    }
+
+    function sendCommand(path) {
+        const ip = document.getElementById('ipAddr').value;
+        if(!ip) return alert("กรุณาระบุ IP Address ของบอร์ดก่อน");
+        
+        fetch(`http://${ip}${path}`)
+            .then(() => updateStatus()) // อัปเดตสถานะทันทีหลังจากส่งคำสั่ง
+            .catch(err => console.error('Send Error:', err));
+    }
+
+    function updateStatus() {
+        const ip = document.getElementById('ipAddr').value;
+        if(!ip) return;
+
+        fetch(`http://${ip}/status`)
+            .then(response => response.json())
+            .then(data => {
+                // อัปเดตตัวเลขความสว่าง
+                document.getElementById('lightVal').innerText = data.light;
+                
+                // อัปเดตสถานะ LED
+                const ledText = document.getElementById('ledStatus');
+                const ledColor = document.getElementById('ledColor');
+                ledText.innerText = data.led ? "เปิดอยู่" : "ปิดอยู่";
+                ledColor.className = data.led ? "led-indicator led-on" : "led-indicator led-off";
+
+                // อัปเดตโหมด
+                document.getElementById('modeStatus').innerText = data.auto ? "อัตโนมัติ" : "ควบคุมมือ";
+            })
+            .catch(err => console.log("กำลังรอการตอบรับจากบอร์ด..."));
+    }
+
+    // สั่งให้ทำงานทุก 2 วินาที
+    setInterval(updateStatus, 2000);
+</script>
+
+</body>
+</html>
